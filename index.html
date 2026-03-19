@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dejumo Store - Spin V3</title>
+    <style>
+        :root { --ink: #1e293b; --paper: #f8fafc; --line: #cbd5e1; --accent: #22c55e; --blue: #3b82f6; --red: #ef4444; --gold: #fbbf24; }
+        body { margin: 0; font-family: 'Courier New', Courier, monospace; background: #0f172a; display: flex; justify-content: center; padding: 10px; overflow-x: hidden; }
+        .notebook { width: 100%; max-width: 450px; background: var(--paper); border-radius: 5px; box-shadow: 12px 12px 0px var(--accent); padding: 30px 20px; position: relative; background-image: linear-gradient(var(--line) 1px, transparent 1px); background-size: 100% 28px; line-height: 28px; color: var(--ink); border: 1px solid #ddd; min-height: 600px; }
+        .header-box { border: 2px solid var(--ink); padding: 10px; margin-bottom: 20px; font-weight: bold; text-align: center; }
+        .reward-section { border: 1px solid var(--ink); padding: 5px 10px; float: right; font-size: 0.75rem; background: white; z-index: 5; position: relative; text-align: center; min-width: 100px; }
+        .wheel-container { position: relative; width: 300px; height: 300px; margin: 40px auto; border: 6px solid var(--ink); border-radius: 50%; background: white; }
+        .wheel-canvas { width: 100%; height: 100%; transition: transform 9s cubic-bezier(0.15, 0, 0, 1); border-radius: 50%; }
+        .arrow { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 35px solid var(--red); z-index: 20; }
+        button { background: white; border: 2px solid var(--ink); padding: 8px 15px; font-weight: bold; cursor: pointer; font-family: inherit; }
+        .hidden { display: none !important; }
+        
+        /* POPUP DESIGN */
+        #win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; display: none; justify-content: center; align-items: center; text-align: center; }
+        .popup-card { background: #1e293b; color: white; border: 5px solid var(--gold); padding: 40px 20px; border-radius: 20px; width: 85%; transform: scale(0.7); transition: 0.3s; box-shadow: 0 0 30px var(--gold); }
+        .popup-card.active { transform: scale(1); }
+
+        #admin-auth, #admin-dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--paper); z-index: 100; padding: 25px; box-sizing: border-box; overflow-y: auto; }
+        .note-box { background: #fffbeb; border: 1px dashed #f59e0b; padding: 10px; font-size: 10px; line-height: 1.3; margin-top: 15px; color: #92400e; text-align: center; }
+        .v-input { padding: 10px; width: 100%; border: 1px solid var(--line); margin-bottom: 10px; box-sizing: border-box; font-family: monospace; }
+        .admin-card { border: 1px solid var(--line); padding: 15px; border-radius: 5px; background: white; margin-bottom: 15px; }
+        #history-list { font-size: 9px; line-height: 1.2; margin-top: 5px; max-height: 150px; overflow-y: auto; background: #f1f5f9; padding: 5px; border: 1px solid #ccc; }
+        .prize-toggle { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="win-popup">
+    <div class="popup-card" id="p-card">
+        <h1 style="color:var(--gold); margin:0;">🔥 PANALO! 🔥</h1>
+        <div id="p-name" style="font-size: 2.5rem; margin: 20px 0; font-weight: 900; text-transform: uppercase;">--</div>
+        <p>Voucher code has been copied!</p>
+        <button onclick="closePop()" style="background:var(--gold); color:black; width:100%; padding:15px; border:none; border-radius:10px; font-size:1.2rem;">SALAMAT!</button>
+    </div>
+</div>
+
+<div class="notebook">
+    <div id="user-view">
+        <div class="reward-section">
+            <div id="timer-label">NEXT REWARD:</div>
+            <div id="timer" style="font-weight: bold;">--:--:--</div>
+            <button id="claim-reward-btn" class="hidden" onclick="collectReward()" style="background:var(--accent); color:white; border:none; padding:2px 5px; font-size:10px;">CLAIM 5 PTS</button>
+        </div>
+        
+        <div class="header-box">DEJUMO STORE</div>
+        <div style="font-size: 10px; opacity: 0.6;">Device ID: <span id="device-id-label">...</span></div>
+        <div style="font-weight: bold;">Points: <span id="pts-display">0</span></div>
+        
+        <div class="wheel-container">
+            <div id="arrow-ptr" class="arrow"></div>
+            <canvas id="user-canvas" class="wheel-canvas" width="500" height="500"></canvas>
+        </div>
+
+        <h3 id="user-msg" style="text-align: center; margin: 10px 0;">Try your luck!</h3>
+        
+        <div style="text-align: center;">
+            <button id="spin-btn" onclick="handleSpin()">🎡 SPIN (10 PTS)</button>
+            <button id="claim-btn" class="hidden" onclick="handleClaim()" style="background: var(--accent); color: white;">COPY UNIQUE VOUCHER</button>
+        </div>
+
+        <div class="note-box">
+            <b>📢 PAALALA:</b><br>
+            I-chat sa <b>Main WiFi</b> yung code at wait reply ng admin. I-vvalidate pa ito para masend sa inyo yung real voucher code.
+        </div>
+
+        <div style="margin-top: 30px; font-size: 0.8rem; border-top: 1px solid var(--line); padding-top: 10px;">
+            <span onclick="openLogin()" style="cursor:pointer; color: #64748b;">[Admin Validator]</span>
+        </div>
+    </div>
+
+    <div id="admin-auth" class="hidden">
+        <h3>Admin Access</h3>
+        <input type="password" id="admin-pass" placeholder="Password" style="padding: 10px; width: 80%;">
+        <br><br>
+        <button onclick="checkPass()">Login</button>
+        <button onclick="closeAdmin()">Back</button>
+    </div>
+
+    <div id="admin-dashboard" class="hidden">
+        <h3 style="margin-top:0">⚙️ Admin Control</h3>
+        <div class="admin-card">
+            <b>🎁 PRIZE ON/OFF</b><br>
+            <div id="prize-controls" style="margin-top:10px;"></div>
+        </div>
+        <div class="admin-card">
+            <b>🕵️ VOUCHER CHECKER</b>
+            <input type="text" id="v-check-input" class="v-input" placeholder="Paste Code Here">
+            <button onclick="validateVoucher()" style="width:100%; background: var(--blue); color:white;">VERIFY</button>
+            <div id="v-result" style="margin-top:5px; font-size:11px; font-weight:bold; text-align:center;"></div>
+            <div id="history-list"></div>
+            <button onclick="clearHistory()" style="width:100%; font-size:9px; margin-top:5px;">CLEAR HISTORY</button>
+        </div>
+        <div class="admin-card">
+            <p style="font-size:11px; margin:0;">Device Wins: <span id="admin-win-count">0</span></p>
+            <button onclick="addPoints(50)">+50 PTS</button>
+            <button onclick="resetWins()" style="background: #fbbf24;">RESET WINS</button>
+        </div>
+        <button onclick="closeAdmin()" style="width:100%; background:var(--ink); color:white;">EXIT</button>
+    </div>
+</div>
+
+<script>
+    const SECRET_SALT = "DEJUMO_STORE_V3_KEY"; 
+    const rewards = [
+        { name: "5 Mins", color: "#a855f7" },
+        { name: "Try Again", color: "#64748b" },
+        { name: "30 Hours", color: "#ef4444" },
+        { name: "10 Mins", color: "#3b82f6" },
+        { name: "10 Hours", color: "#f59e0b" },
+        { name: "Jackpot", color: "#000000" }
+    ];
+
+    let deviceID = localStorage.getItem("dejumo_did") || "D" + Math.floor(Math.random()*8999+1000);
+    localStorage.setItem("dejumo_did", deviceID);
+    document.getElementById("device-id-label").innerText = deviceID;
+
+    let points = parseInt(localStorage.getItem("dejumo_v11_pts") || 20);
+    let winCount = parseInt(localStorage.getItem("dejumo_v11_wins") || 0);
+    let nextRewardTime = parseInt(localStorage.getItem("dejumo_v11_next") || Date.now());
+    let verifyHistory = JSON.parse(localStorage.getItem("dejumo_v11_hist") || "[]");
+    let prizeStatus = JSON.parse(localStorage.getItem("dejumo_prizes") || "[true, true, false, false, false, false]");
+
+    let isSpinning = false;
+    let rotation = 0;
+    let currentWonIdx = null;
+
+    function draw() {
+        const canv = document.getElementById("user-canvas");
+        const ctx = canv.getContext("2d");
+        const arc = (2 * Math.PI) / rewards.length;
+        ctx.clearRect(0,0,500,500);
+        rewards.forEach((r, i) => {
+            ctx.beginPath(); ctx.fillStyle = r.color; ctx.moveTo(250, 250);
+            ctx.arc(250, 250, 250, i * arc, (i + 1) * arc); ctx.fill(); ctx.stroke();
+            ctx.save(); ctx.translate(250, 250); ctx.rotate(i * arc + arc / 2);
+            ctx.textAlign = "right"; ctx.fillStyle = "white"; ctx.font = "bold 22px Courier";
+            ctx.fillText(r.name, 230, 10); ctx.restore();
+        });
+    }
+
+    function handleSpin() {
+        if (isSpinning) return;
+        if (points < 10) return alert("Kulang points!");
+        let active = [];
+        prizeStatus.forEach((s, i) => { if(s) active.push(i); });
+        if(active.length === 0) active = [1];
+        currentWonIdx = active[Math.floor(Math.random()*active.length)];
+        if (winCount >= 2 && currentWonIdx !== 1) currentWonIdx = 1; 
+        points -= 10; updateUI(); isSpinning = true;
+        document.getElementById("claim-btn").classList.add("hidden");
+        const slice = 360 / rewards.length;
+        let offset = (currentWonIdx === 1) ? ([0.45, -0.45, 0.1][Math.floor(Math.random()*3)] * slice) : 0;
+        let finalDeg = (360 - (currentWonIdx * slice)) - (slice / 2) - 90 + offset;
+        rotation = rotation + 3600 + (finalDeg - (rotation % 360));
+        document.getElementById("user-canvas").style.transform = `rotate(${rotation}deg)`;
+        setTimeout(() => { isSpinning = false; if (currentWonIdx !== 1) document.getElementById("claim-btn").classList.remove("hidden"); saveToLocal(); }, 9100);
+    }
+
+    function handleClaim() {
+        let code = generateVoucher(rewards[currentWonIdx].name);
+        navigator.clipboard.writeText(code).then(() => {
+            winCount++;
+            document.getElementById("p-name").innerText = rewards[currentWonIdx].name;
+            document.getElementById("win-popup").style.display = "flex";
+            setTimeout(()=> document.getElementById("p-card").classList.add("active"), 50);
+            document.getElementById("claim-btn").classList.add("hidden");
+            saveToLocal();
+        });
+    }
+
+    function closePop() { 
+        document.getElementById("p-card").classList.remove("active");
+        setTimeout(()=> document.getElementById("win-popup").style.display = "none", 300);
+    }
+
+    function generateVoucher(pName) {
+        let n = Date.now().toString(36).toUpperCase(); 
+        let raw = deviceID + pName + SECRET_SALT + n;
+        let h = 0; for (let i = 0; i < raw.length; i++) { h = (h << 5) - h + raw.charCodeAt(i); h |= 0; }
+        return `${deviceID}-${pName.replace(" ","").toUpperCase()}-${n}-${Math.abs(h).toString(36).toUpperCase()}`;
+    }
+
+    function validateVoucher() {
+        let input = document.getElementById("v-check-input").value.trim().toUpperCase();
+        let res = document.getElementById("v-result");
+        if(!input) return;
+        let isDup = verifyHistory.some(h => h.code === input);
+        let parts = input.split("-");
+        if(parts.length < 4) { res.innerText = "❌ INVALID"; return; }
+        let [dId, pShort, n, f] = parts;
+        let pName = rewards.find(r => r.name.replace(" ","").toUpperCase() === pShort)?.name || pShort;
+        let raw = dId + pName + SECRET_SALT + n;
+        let h = 0; for (let i = 0; i < raw.length; i++) { h = (h << 5) - h + raw.charCodeAt(i); h |= 0; }
+        if(f === Math.abs(h).toString(36).toUpperCase()) {
+            res.innerText = isDup ? "⚠️ USED/DUPLICATE!" : "✅ LEGIT: " + pName;
+            res.style.color = isDup ? "orange" : "green";
+            if(!isDup) {
+                verifyHistory.unshift({ t: new Date().toLocaleTimeString(), r: pName, id: dId, code: input });
+                localStorage.setItem("dejumo_v11_hist", JSON.stringify(verifyHistory.slice(0,50)));
+                renderHistory();
+            }
+        } else { res.innerText = "❌ FAKE!"; res.style.color = "red"; }
+    }
+
+    function renderHistory() {
+        document.getElementById("history-list").innerHTML = verifyHistory.map(h => `<div>[${h.t}] <b>${h.r}</b><br><span style="font-size:7px;">${h.code}</span></div>`).join('');
+    }
+
+    function updateTimer() {
+        const diff = nextRewardTime - Date.now();
+        const tmr = document.getElementById("timer"); const btn = document.getElementById("claim-reward-btn");
+        if (diff <= 0) { tmr.classList.add("hidden"); btn.classList.remove("hidden"); }
+        else { tmr.classList.remove("hidden"); btn.classList.add("hidden");
+            const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+            tmr.innerText = `${h}h ${m}m ${s}s`;
+        }
+    }
+
+    function collectReward() { points += 5; nextRewardTime = Date.now() + (5 * 60 * 60 * 1000); saveToLocal(); }
+    function openLogin() { document.getElementById("admin-auth").classList.remove("hidden"); }
+    function closeAdmin() { document.getElementById("admin-auth").classList.add("hidden"); document.getElementById("admin-dashboard").classList.add("hidden"); }
+    function checkPass() { if (document.getElementById("admin-pass").value === "stonecold") { document.getElementById("admin-dashboard").classList.remove("hidden"); renderPrizeControls(); renderHistory(); } }
+    function renderPrizeControls() { document.getElementById("prize-controls").innerHTML = rewards.map((r, i) => `<div class="prize-toggle"><span>${r.name}</span><input type="checkbox" ${prizeStatus[i] ? 'checked' : ''} onchange="tp(${i})"></div>`).join(''); }
+    function tp(i) { prizeStatus[i] = !prizeStatus[i]; localStorage.setItem("dejumo_prizes", JSON.stringify(prizeStatus)); }
+    function saveToLocal() { localStorage.setItem("dejumo_v11_pts", points); localStorage.setItem("dejumo_v11_next", nextRewardTime); localStorage.setItem("dejumo_v11_wins", winCount); updateUI(); }
+    function updateUI() { document.getElementById("pts-display").innerText = points; document.getElementById("admin-win-count").innerText = winCount; }
+    function addPoints(n) { points += n; saveToLocal(); }
+    function resetWins() { winCount = 0; saveToLocal(); }
+    function clearHistory() { verifyHistory = []; localStorage.removeItem("dejumo_v11_hist"); renderHistory(); }
+
+    draw(); updateUI(); setInterval(updateTimer, 1000);
+</script>
+</body>
+</html>
